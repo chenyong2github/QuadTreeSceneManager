@@ -20,28 +20,34 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+
+//四元数用于平面分割,不能旋转格子
 //Any object that you insert into the tree must implement this interface
 public interface IQuadTreeObject
 {
     Vector2 GetPosition();
 }
+
 public class QuadTree<T> where T : IQuadTreeObject
 {
-    private int m_maxObjectCount;
-    private List<T> m_storedObjects;
-    private Rect m_bounds;
-    private QuadTree<T>[] cells;
+    private float m_minWidth;         //格子最小宽度(优先级大于最大数目)
+    private int m_maxObjectCount;     //格子内最大容纳的物体数目
+    private List<T> m_storedObjects;  //格子内的物体
+    private Rect m_bounds;            //格子范围
+    private QuadTree<T>[] cells;      //子节点 固定4个
 
-    public QuadTree(int maxSize, Rect bounds)
+    public QuadTree(int maxSize, float minWidth, Rect bounds)
     {
         m_bounds = bounds;
+        m_minWidth = minWidth;
         m_maxObjectCount = maxSize;
         cells = new QuadTree<T>[4];
         m_storedObjects = new List<T>(maxSize);
     }
+
     public void Insert(T objectToInsert)
     {
-
+        //该格子有子节点 往子节点里面塞
         if (cells[0] != null)
         {
             int iCell = GetCellToInsertObject(objectToInsert.GetPosition());
@@ -51,9 +57,11 @@ public class QuadTree<T> where T : IQuadTreeObject
             }
             return;
         }
+
+        //没有子节点 自己存储
         m_storedObjects.Add(objectToInsert);
-        //Objects exceed the maximum count
-        if (m_storedObjects.Count > m_maxObjectCount)
+        //大于最大存储数目拆为四个子节点
+        if (m_storedObjects.Count > m_maxObjectCount && (m_minWidth > 0 && m_bounds.width > m_minWidth))
         {
             //Split the quad into 4 sections
             if (cells[0] == null)
@@ -62,14 +70,14 @@ public class QuadTree<T> where T : IQuadTreeObject
                 float subHeight = (m_bounds.height / 2f);
                 float x = m_bounds.x;
                 float y = m_bounds.y;
-                cells[0] = new QuadTree<T>(m_maxObjectCount, new Rect(x + subWidth, y, subWidth, subHeight));
-                cells[1] = new QuadTree<T>(m_maxObjectCount, new Rect(x, y, subWidth, subHeight));
-                cells[2] = new QuadTree<T>(m_maxObjectCount, new Rect(x, y + subHeight, subWidth, subHeight));
-                cells[3] = new QuadTree<T>(m_maxObjectCount, new Rect(x + subWidth, y + subHeight, subWidth, subHeight));
+                cells[0] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x + subWidth, y, subWidth, subHeight));
+                cells[1] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x, y, subWidth, subHeight));
+                cells[2] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x, y + subHeight, subWidth, subHeight));
+                cells[3] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x + subWidth, y + subHeight, subWidth, subHeight));
             }
+
             //Reallocate this quads objects into its children
-            int i = m_storedObjects.Count - 1;
-            while (i >= 0)
+            for (int i = m_storedObjects.Count - 1; i >= 0; --i)
             {
                 T storedObj = m_storedObjects[i];
                 int iCell = GetCellToInsertObject(storedObj.GetPosition());
@@ -78,10 +86,10 @@ public class QuadTree<T> where T : IQuadTreeObject
                     cells[iCell].Insert(storedObj);
                 }
                 m_storedObjects.RemoveAt(i);
-                i--;
             }
         }
     }
+
     public void Remove(T objectToRemove)
     {
         if (ContainsLocation(objectToRemove.GetPosition()))
@@ -96,11 +104,16 @@ public class QuadTree<T> where T : IQuadTreeObject
             }
         }
     }
-    public List<T> RetrieveObjectsInArea(Rect area)
+
+    public List<T> RetrieveObjectsInArea(Rect area, List<T> returnedObjects = null)
     {
         if (rectOverlap(m_bounds, area))
         {
-            List<T> returnedObjects = new List<T>();
+            if (returnedObjects == null)
+            {
+                returnedObjects = new List<T>();
+            }
+
             for (int i = 0; i < m_storedObjects.Count; i++)
             {
                 if (area.Contains(m_storedObjects[i].GetPosition()))
@@ -108,20 +121,17 @@ public class QuadTree<T> where T : IQuadTreeObject
                     returnedObjects.Add(m_storedObjects[i]);
                 }
             }
+
             if (cells[0] != null)
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    List<T> cellObjects = cells[i].RetrieveObjectsInArea(area);
-                    if (cellObjects != null)
-                    {
-                        returnedObjects.AddRange(cellObjects);
-                    }
+                    cells[i].RetrieveObjectsInArea(area, returnedObjects);
                 }
             }
-            return returnedObjects;
         }
-        return null;
+
+        return returnedObjects;
     }
 
     // Clear quadtree
@@ -138,10 +148,13 @@ public class QuadTree<T> where T : IQuadTreeObject
             }
         }
     }
+
     public bool ContainsLocation(Vector2 location)
     {
         return m_bounds.Contains(location);
     }
+
+    //该位置 属于哪个字节点
     private int GetCellToInsertObject(Vector2 location)
     {
         for (int i = 0; i < 4; i++)
@@ -153,9 +166,13 @@ public class QuadTree<T> where T : IQuadTreeObject
         }
         return -1;
     }
-    bool valueInRange(float value, float min, float max)
-    { return (value >= min) && (value <= max); }
 
+    bool valueInRange(float value, float min, float max)
+    {
+        return (value >= min) && (value <= max);
+    }
+
+    //两个矩形是否重合
     bool rectOverlap(Rect A, Rect B)
     {
         bool xOverlap = valueInRange(A.x, B.x, B.x + B.width) ||
@@ -166,6 +183,7 @@ public class QuadTree<T> where T : IQuadTreeObject
 
         return xOverlap && yOverlap;
     }
+
     public void DrawDebug()
     {
         Gizmos.DrawLine(new Vector3(m_bounds.x, 0, m_bounds.y), new Vector3(m_bounds.x, 0, m_bounds.y + m_bounds.height));
