@@ -44,6 +44,7 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     public int mapSize = 256;
     public int mapDensity = 5;
+    public int mapMinWidth = 10;
 
     QuadTree<SceneNode> quadTree;
 
@@ -60,7 +61,7 @@ public class QuadTreeSceneManager : MonoBehaviour
     {
         sceneNodes = RetrieveSceneNodes();
 
-        quadTree = new QuadTree<SceneNode>(mapDensity, new Rect(-mapSize/2, -mapSize/2, mapSize, mapSize));
+        quadTree = new QuadTree<SceneNode>(mapDensity, mapMinWidth, new Rect(-mapSize/2, -mapSize/2, mapSize, mapSize));
         foreach (SceneNode to in sceneNodes)
         {
             quadTree.Insert(to);
