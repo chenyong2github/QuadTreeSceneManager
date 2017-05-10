@@ -52,7 +52,7 @@ public class QuadTreeSceneManager : MonoBehaviour
     Rect visibleArea;
     List<SceneNode> visibleSceneNodes;
 
-    List<SceneNode> loadedSceneNodes = new List<SceneNode>();
+    HashSet<SceneNode> loadedSceneNodes = new HashSet<SceneNode>();
 
     Dictionary<string, GameObject> subParent = new Dictionary<string, GameObject>();
 
