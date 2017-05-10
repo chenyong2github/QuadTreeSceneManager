@@ -179,10 +179,14 @@ public class QuadTreeSceneManager : MonoBehaviour
         return new Rect(Random.Range(-mapSize / 2, mapSize / 2), Random.Range(-mapSize / 2, mapSize / 2), 100 * mapSize / 1024f, 100 * mapSize / 1024f);
     }
 
+    List<SceneNode> returnedSceneNodes   = new List<SceneNode>();
+    List<SceneNode> needRemoveSceneNodes = new List<SceneNode>();
     void UpdateSceneNodes()
     {
         visibleArea = GetPlayerVisibleArea();
-        visibleSceneNodes = quadTree.RetrieveObjectsInArea(visibleArea);
+
+        returnedSceneNodes.Clear();
+        visibleSceneNodes = quadTree.RetrieveObjectsInArea(visibleArea, returnedSceneNodes);
 
         // load
         foreach (SceneNode sn in visibleSceneNodes)
@@ -196,7 +200,7 @@ public class QuadTreeSceneManager : MonoBehaviour
         }
 
         // unload
-        List<SceneNode> needRemoveSceneNodes = new List<SceneNode>();
+        needRemoveSceneNodes.Clear();
         if (player != null)
         {
             foreach (SceneNode sn in loadedSceneNodes)
