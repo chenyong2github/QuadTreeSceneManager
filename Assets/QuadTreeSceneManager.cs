@@ -5,6 +5,7 @@ public class QuadTreeSceneManager : MonoBehaviour
 {
     public class SceneNode : IQuadTreeObject
     {
+        public List<Texture> m_textures;
         public string m_name;
         public string m_prefabName;        
         public Vector3 m_vPosition;
@@ -47,6 +48,8 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     Dictionary<string, int> loadCount = new Dictionary<string, int>();
     Dictionary<string, GameObject> loadObj = new Dictionary<string, GameObject>();
+
+    Dictionary<Texture, int> texturesRefs = new Dictionary<Texture, int>();
 
     void OnEnable()
     {
@@ -123,58 +126,6 @@ public class QuadTreeSceneManager : MonoBehaviour
         }
 
         return sceneNodes;
-
-        /*
-        if (sceneNodes == null)
-        {
-            sceneNodes = new List<SceneNode>(100);
-        }
-
-        subParent.Clear();
-
-        foreach (Transform t in transform)
-        {
-            SceneNodeData snd = t.GetComponent<SceneNodeData>();
-            if (snd)
-            {
-                subParent[t.name] = t.gameObject;
-
-                foreach(SceneNodeData.SceneNode sn in snd.sceneNodes)
-                {
-                    SceneNode newObject = new SceneNode(sn.parent, sn.name, sn.position);
-                    sceneNodes.Add(newObject);
-                }
-            }
-        }
-
-        return sceneNodes;
-        */
-
-        /*
-        MeshRenderer[] mrs = GameObject.FindObjectsOfType<MeshRenderer>();
-        SkinnedMeshRenderer[] smrs = GameObject.FindObjectsOfType<SkinnedMeshRenderer>();
-
-        List<SceneNode> testObjects = new List<SceneNode>(mrs.Length);
-        foreach (MeshRenderer mr in mrs)
-        {
-            if (mr.gameObject.layer == 8) // Road
-                continue;
-
-            SceneNode newObject = new SceneNode(mr.gameObject, new Vector3(mr.transform.position.x, 0, mr.transform.position.z));
-            testObjects.Add(newObject);
-        }
-
-        foreach (SkinnedMeshRenderer smr in smrs)
-        {
-            if (smr.gameObject.layer == 8) // Road
-                continue;
-
-            SceneNode newObject = new SceneNode(smr.gameObject, new Vector3(smr.transform.position.x, 0, smr.transform.position.z));
-            testObjects.Add(newObject);
-        }
-
-        return testObjects;
-        */
     }
 
     Rect GetPlayerVisibleArea()
@@ -245,8 +196,39 @@ public class QuadTreeSceneManager : MonoBehaviour
                 return;
             }
 
+            sn.m_textures = new List<Texture>();
+
             GameObject go = GameObject.Instantiate(obj) as GameObject;
             go.transform.parent = objParent.transform;
+
+            MeshRenderer[] mrs = GetComponentsInChildren<MeshRenderer>();
+            SkinnedMeshRenderer[] smrs = GetComponentsInChildren<SkinnedMeshRenderer>();
+
+            foreach (MeshRenderer mr in mrs)
+            {
+                Material[] mats = mr.sharedMaterials;
+                foreach (Material mat in mats)
+                {
+                    if (mat.mainTexture != null)
+                    {
+                        sn.m_textures.Add(mat.mainTexture);
+                    }
+                }
+            }
+
+            foreach (SkinnedMeshRenderer smr in smrs)
+            {
+                Material[] mats = smr.sharedMaterials;
+                foreach (Material mat in mats)
+                {
+                    if (mat.mainTexture != null)
+                    {
+                        sn.m_textures.Add(mat.mainTexture);
+                    }
+                }
+            }
+
+            IncreaseTextureRefs(sn);
 
             loadCount.Add(sn.m_prefabName, 1);
             loadObj.Add(sn.m_prefabName, go);
@@ -272,7 +254,50 @@ public class QuadTreeSceneManager : MonoBehaviour
 
         loadCount.Remove(sn.m_prefabName);
         loadObj.Remove(sn.m_prefabName);
+
+        DecreaseTextureRefs(sn);
     }
 
-    
+
+    void IncreaseTextureRefs(SceneNode sn)
+    {
+        foreach (Texture tex in sn.m_textures)
+        {
+            if (texturesRefs.ContainsKey(tex))
+            {
+                texturesRefs[tex]++;
+            }
+            else
+            {
+                texturesRefs[tex] = 1;
+            }
+        }
+    }
+
+    List<Texture> needUnloadTextures = new List<Texture>();
+    void DecreaseTextureRefs(SceneNode sn)
+    {
+        needUnloadTextures.Clear();
+
+        foreach (Texture tex in sn.m_textures)
+        {
+            if (texturesRefs.ContainsKey(tex))
+            {
+                texturesRefs[tex]--;
+
+                if (texturesRefs[tex] <= 0)// need unload
+                {
+                    needUnloadTextures.Add(tex);
+                }
+            }
+        }
+
+        foreach (Texture tex in needUnloadTextures)
+        {
+            Resources.UnloadAsset(tex);
+
+            texturesRefs.Remove(tex);
+        }
+    }
+
 }
