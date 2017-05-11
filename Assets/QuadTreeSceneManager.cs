@@ -5,30 +5,17 @@ public class QuadTreeSceneManager : MonoBehaviour
 {
     public class SceneNode : IQuadTreeObject
     {
-        public GameObject m_gameObject;
         public string m_name;
-        public string m_parent;        
+        public string m_prefabName;        
         public Vector3 m_vPosition;
         public bool m_bLoaded;
 
-        public SceneNode(string parent, string name, Vector3 position, bool loaded = false)
+        public SceneNode(string prefabName, string name, Vector3 position, bool loaded = false)
         {
-            m_parent = parent;
+            m_prefabName = prefabName;
             m_name = name;
             m_vPosition = position; m_vPosition.y = 0;
             m_bLoaded = loaded;
-        }
-
-        public SceneNode(GameObject go, Vector3 position, bool loaded = false)
-        {
-            m_gameObject = go;
-            m_vPosition = position; m_vPosition.y = 0;
-            m_bLoaded = loaded;
-        }
-
-        public GameObject GetGameObject()
-        {
-            return m_gameObject;
         }
 
         public Vector2 GetPosition()
@@ -39,6 +26,7 @@ public class QuadTreeSceneManager : MonoBehaviour
     }
 
     public GameObject player;
+    public SceneNodeData snd;
     public int loadDistance = 20;
     public int unloadDistance = 30;
 
@@ -55,7 +43,10 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     HashSet<SceneNode> loadedSceneNodes = new HashSet<SceneNode>();
 
-    Dictionary<string, GameObject> subParent = new Dictionary<string, GameObject>();
+    GameObject objParent;
+
+    Dictionary<string, int> loadCount = new Dictionary<string, int>();
+    Dictionary<string, GameObject> loadObj = new Dictionary<string, GameObject>();
 
     void OnEnable()
     {
@@ -66,6 +57,9 @@ public class QuadTreeSceneManager : MonoBehaviour
         {
             quadTree.Insert(to);
         }
+
+        objParent = new GameObject();
+        objParent.name = "QuadTree";
     }
 
     void Awake()
@@ -122,6 +116,20 @@ public class QuadTreeSceneManager : MonoBehaviour
             sceneNodes = new List<SceneNode>(100);
         }
 
+        foreach (var item in snd.nodes)
+        {
+            SceneNode newObject = new SceneNode(item.prefabName, item.name, item.position);
+            sceneNodes.Add(newObject);
+        }
+
+        return sceneNodes;
+
+        /*
+        if (sceneNodes == null)
+        {
+            sceneNodes = new List<SceneNode>(100);
+        }
+
         subParent.Clear();
 
         foreach (Transform t in transform)
@@ -140,6 +148,7 @@ public class QuadTreeSceneManager : MonoBehaviour
         }
 
         return sceneNodes;
+        */
 
         /*
         MeshRenderer[] mrs = GameObject.FindObjectsOfType<MeshRenderer>();
@@ -205,10 +214,7 @@ public class QuadTreeSceneManager : MonoBehaviour
         {
             foreach (SceneNode sn in loadedSceneNodes)
             {
-                if (sn.m_gameObject == null)
-                    continue;
-
-                Vector2 v = new Vector2(player.transform.position.x - sn.m_gameObject.transform.position.x, player.transform.position.z - sn.m_gameObject.transform.position.z);
+                Vector2 v = new Vector2(player.transform.position.x - sn.m_vPosition.x, player.transform.position.z - sn.m_vPosition.z);
                 if (v.sqrMagnitude > unloadDistance * unloadDistance)
                 {
                     needRemoveSceneNodes.Add(sn);                    
@@ -226,42 +232,46 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     void LoadSceneNode(SceneNode sn)
     {
-        if (sn.m_bLoaded)
-            return;
-
-        UnityEngine.Object obj =  Resources.Load("st_jhs_01/" + sn.m_parent + "/" +sn.m_name);
-        if (obj == null)
+        if (loadCount.ContainsKey(sn.m_prefabName))
         {
-            Debug.LogError(sn.m_name + "isn't exist!");
-            return;
+            loadCount[sn.m_prefabName]++;
         }
-        
-        GameObject go = GameObject.Instantiate(obj) as GameObject;
-        GameObject parent = subParent[sn.m_parent];
-        if (parent)
+        else
         {
-            go.transform.parent = parent.transform;
-        } 
+            UnityEngine.Object obj = Resources.Load("QuadTree/" + snd.treeName + "/" + sn.m_prefabName);
+            if (obj == null)
+            {
+                Debug.LogError(sn.m_prefabName + "isn't exist!");
+                return;
+            }
 
-        sn.m_gameObject = go;
+            GameObject go = GameObject.Instantiate(obj) as GameObject;
+            go.transform.parent = objParent.transform;
+
+            loadCount.Add(sn.m_prefabName, 1);
+            loadObj.Add(sn.m_prefabName, go);
+        }
+
         sn.m_bLoaded = true;
-
-        if (sn.m_gameObject)
-        {
-            sn.m_gameObject.SetActive(true);
-        }
     }
 
     void UnloadSceneNode(SceneNode sn)
     {
-        Destroy(sn.m_gameObject);
-        sn.m_gameObject = null;
-        sn.m_bLoaded = false;
-
-        if (sn.m_gameObject)
+        if (!loadCount.ContainsKey(sn.m_prefabName))
         {
-            sn.m_gameObject.SetActive(false);
+            return;
         }
+
+        loadCount[sn.m_prefabName]--;
+        if (loadCount[sn.m_prefabName] > 0)
+        {
+            return;
+        }
+
+        Destroy(loadObj[sn.m_prefabName]);
+
+        loadCount.Remove(sn.m_prefabName);
+        loadObj.Remove(sn.m_prefabName);
     }
 
     

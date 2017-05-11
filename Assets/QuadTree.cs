@@ -28,32 +28,45 @@ public interface IQuadTreeObject
     Vector2 GetPosition();
 }
 
+[System.Serializable]
 public class QuadTree<T> where T : IQuadTreeObject
 {
     private float m_minWidth;         //格子最小宽度(优先级大于最大数目)
     private int m_maxObjectCount;     //格子内最大容纳的物体数目
     private List<T> m_storedObjects;  //格子内的物体
     private Rect m_bounds;            //格子范围
-    private QuadTree<T>[] cells;      //子节点 固定4个
+    private QuadTree<T>[] m_cells;      //子节点 固定4个
+
+    private string m_prefabName;      //需要被加载的prebab名字
+
+    public string prefabName { get { return m_prefabName; } }
+
+    public QuadTree<T>[] cells { get { return m_cells; } }
+
+    public List<T> storedObjects { get { return m_storedObjects; } }
+
+    public QuadTree() { }
 
     public QuadTree(int maxSize, float minWidth, Rect bounds)
     {
         m_bounds = bounds;
         m_minWidth = minWidth;
         m_maxObjectCount = maxSize;
-        cells = new QuadTree<T>[4];
+
+        m_cells = null;
         m_storedObjects = new List<T>(maxSize);
+        m_prefabName = null;
     }
 
     public void Insert(T objectToInsert)
     {
         //该格子有子节点 往子节点里面塞
-        if (cells[0] != null)
+        if (m_cells != null)
         {
             int iCell = GetCellToInsertObject(objectToInsert.GetPosition());
             if (iCell > -1)
             {
-                cells[iCell].Insert(objectToInsert);
+                m_cells[iCell].Insert(objectToInsert);
             }
             return;
         }
@@ -64,16 +77,17 @@ public class QuadTree<T> where T : IQuadTreeObject
         if (m_storedObjects.Count > m_maxObjectCount && (m_minWidth > 0 && m_bounds.width > m_minWidth))
         {
             //Split the quad into 4 sections
-            if (cells[0] == null)
+            if (m_cells == null)
             {
                 float subWidth = (m_bounds.width / 2f);
                 float subHeight = (m_bounds.height / 2f);
                 float x = m_bounds.x;
                 float y = m_bounds.y;
-                cells[0] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x + subWidth, y, subWidth, subHeight));
-                cells[1] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x, y, subWidth, subHeight));
-                cells[2] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x, y + subHeight, subWidth, subHeight));
-                cells[3] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x + subWidth, y + subHeight, subWidth, subHeight));
+                m_cells = new QuadTree<T>[4];
+                m_cells[0] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x + subWidth, y, subWidth, subHeight));
+                m_cells[1] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x, y, subWidth, subHeight));
+                m_cells[2] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x, y + subHeight, subWidth, subHeight));
+                m_cells[3] = new QuadTree<T>(m_maxObjectCount, m_minWidth, new Rect(x + subWidth, y + subHeight, subWidth, subHeight));
             }
 
             //Reallocate this quads objects into its children
@@ -83,10 +97,12 @@ public class QuadTree<T> where T : IQuadTreeObject
                 int iCell = GetCellToInsertObject(storedObj.GetPosition());
                 if (iCell > -1)
                 {
-                    cells[iCell].Insert(storedObj);
+                    m_cells[iCell].Insert(storedObj);
                 }
-                m_storedObjects.RemoveAt(i);
             }
+
+            //有子节点 本身不在存储
+            m_storedObjects.Clear();
         }
     }
 
@@ -95,14 +111,64 @@ public class QuadTree<T> where T : IQuadTreeObject
         if (ContainsLocation(objectToRemove.GetPosition()))
         {
             m_storedObjects.Remove(objectToRemove);
-            if (cells[0] != null)
+            if (m_cells != null)
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    cells[i].Remove(objectToRemove);
+                    m_cells[i].Remove(objectToRemove);
                 }
             }
         }
+    }
+
+    public void SetPrefabName(string name)
+    {
+        if (m_storedObjects.Count > 0)
+        {
+            m_prefabName = name;
+        }
+        else
+        {
+            m_prefabName = null;
+        }
+
+        if (m_cells != null)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                m_cells[i].SetPrefabName(string.Format("{0}_{1}", name, i));
+            }
+        }
+    }
+
+    public List<string> RetrievePrefabsInArea(Rect area, List<string> returnedObjects)
+    {
+        if (rectOverlap(m_bounds, area))
+        {
+            //节点本身的Prefab
+            for (int i = 0; i < m_storedObjects.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(m_prefabName))
+                {
+                    if (area.Contains(m_storedObjects[i].GetPosition()))
+                    {
+                        returnedObjects.Add(m_prefabName);
+                        break;
+                    }
+                }
+            }
+
+            //子节点
+            if (m_cells != null)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    m_cells[i].RetrievePrefabsInArea(area, returnedObjects);
+                }
+            }
+        }
+
+        return returnedObjects;
     }
 
     public List<T> RetrieveObjectsInArea(Rect area, List<T> returnedObjects = null)
@@ -122,11 +188,11 @@ public class QuadTree<T> where T : IQuadTreeObject
                 }
             }
 
-            if (cells[0] != null)
+            if (m_cells != null)
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    cells[i].RetrieveObjectsInArea(area, returnedObjects);
+                    m_cells[i].RetrieveObjectsInArea(area, returnedObjects);
                 }
             }
         }
@@ -139,12 +205,12 @@ public class QuadTree<T> where T : IQuadTreeObject
     {
         m_storedObjects.Clear();
 
-        for (int i = 0; i < cells.Length; i++)
+        for (int i = 0; i < m_cells.Length; i++)
         {
-            if (cells[i] != null)
+            if (m_cells[i] != null)
             {
-                cells[i].Clear();
-                cells[i] = null;
+                m_cells[i].Clear();
+                m_cells[i] = null;
             }
         }
     }
@@ -159,7 +225,7 @@ public class QuadTree<T> where T : IQuadTreeObject
     {
         for (int i = 0; i < 4; i++)
         {
-            if (cells[i].ContainsLocation(location))
+            if (m_cells[i].ContainsLocation(location))
             {
                 return i;
             }
@@ -190,15 +256,25 @@ public class QuadTree<T> where T : IQuadTreeObject
         Gizmos.DrawLine(new Vector3(m_bounds.x, 0, m_bounds.y), new Vector3(m_bounds.x + m_bounds.width, 0, m_bounds.y));
         Gizmos.DrawLine(new Vector3(m_bounds.x + m_bounds.width, 0, m_bounds.y), new Vector3(m_bounds.x + m_bounds.width, 0, m_bounds.y + m_bounds.height));
         Gizmos.DrawLine(new Vector3(m_bounds.x, 0, m_bounds.y + m_bounds.height), new Vector3(m_bounds.x + m_bounds.width, 0, m_bounds.y + m_bounds.height));
-        if (cells[0] != null)
+        if (m_cells != null)
         {
-            for (int i = 0; i < cells.Length; i++)
+            for (int i = 0; i < m_cells.Length; i++)
             {
-                if (cells[i] != null)
+                if (m_cells[i] != null)
                 {
-                    cells[i].DrawDebug();
+                    m_cells[i].DrawDebug();
                 }
             }
         }
+
+        for (int i = 0; i < m_storedObjects.Count; i++)
+        {
+            Gizmos.DrawSphere(V2toV3(m_storedObjects[i].GetPosition()), m_minWidth * 0.02f);
+        }
+    }
+
+    Vector3 V2toV3(Vector2 v2)
+    {
+        return new Vector3(v2.x, 0, v2.y);
     }
 }
