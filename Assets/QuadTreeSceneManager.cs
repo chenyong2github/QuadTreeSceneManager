@@ -5,6 +5,8 @@ public class QuadTreeSceneManager : MonoBehaviour
 {
     public class SceneNode : IQuadTreeObject
     {
+        public GameObject m_go;
+        public List<Material> m_materials;
         public List<Texture> m_textures;
         public string m_name;
         public string m_prefabName;        
@@ -47,10 +49,7 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     GameObject objParent;
 
-    Dictionary<string, int> loadCount = new Dictionary<string, int>();
-    Dictionary<string, GameObject> loadObj = new Dictionary<string, GameObject>();
-
-    Dictionary<Texture, int> texturesRefs = new Dictionary<Texture, int>();
+    Dictionary<Texture, int> textureRefs = new Dictionary<Texture, int>();
 
     void OnEnable()
     {
@@ -70,6 +69,12 @@ public class QuadTreeSceneManager : MonoBehaviour
     void Awake()
     {
         Application.backgroundLoadingPriority = ThreadPriority.Normal;
+        GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
+
+        foreach (GameObject go in gos)
+        {
+            IncreaseTextureRefs(go);
+        }
     }
 
     void Update()
@@ -210,121 +215,138 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     void LoadSceneNode(SceneNode sn)
     {
-        if (loadCount.ContainsKey(sn.m_prefabName))
+        if (sn.m_bLoaded)
+            return;
+
+        UnityEngine.Object obj = Resources.Load("QuadTree/" + snd.treeName + "/" + sn.m_prefabName);
+        if (obj == null)
         {
-            loadCount[sn.m_prefabName]++;
+            Debug.LogError(sn.m_prefabName + "isn't exist!");
+            return;
         }
-        else
-        {
-            UnityEngine.Object obj = Resources.Load("QuadTree/" + snd.treeName + "/" + sn.m_prefabName);
-            if (obj == null)
-            {
-                Debug.LogError(sn.m_prefabName + "isn't exist!");
-                return;
-            }
 
-            sn.m_textures = new List<Texture>();
+        GameObject go = GameObject.Instantiate(obj) as GameObject;
+        go.transform.parent = objParent.transform;
+        sn.m_go = go;
 
-            GameObject go = GameObject.Instantiate(obj) as GameObject;
-            go.transform.parent = objParent.transform;
-
-            MeshRenderer[] mrs = GetComponentsInChildren<MeshRenderer>();
-            SkinnedMeshRenderer[] smrs = GetComponentsInChildren<SkinnedMeshRenderer>();
-
-            foreach (MeshRenderer mr in mrs)
-            {
-                Material[] mats = mr.sharedMaterials;
-                foreach (Material mat in mats)
-                {
-                    if (mat.mainTexture != null)
-                    {
-                        sn.m_textures.Add(mat.mainTexture);
-                    }
-                }
-            }
-
-            foreach (SkinnedMeshRenderer smr in smrs)
-            {
-                Material[] mats = smr.sharedMaterials;
-                foreach (Material mat in mats)
-                {
-                    if (mat.mainTexture != null)
-                    {
-                        sn.m_textures.Add(mat.mainTexture);
-                    }
-                }
-            }
-
-            IncreaseTextureRefs(sn);
-
-            loadCount.Add(sn.m_prefabName, 1);
-            loadObj.Add(sn.m_prefabName, go);
-        }
+        IncreaseTextureRefs(sn);
 
         sn.m_bLoaded = true;
     }
 
     void UnloadSceneNode(SceneNode sn)
     {
-        if (!loadCount.ContainsKey(sn.m_prefabName))
-        {
+        if (!sn.m_bLoaded)
             return;
-        }
 
-        loadCount[sn.m_prefabName]--;
-        if (loadCount[sn.m_prefabName] > 0)
-        {
-            return;
-        }
-
-        Destroy(loadObj[sn.m_prefabName]);
-
-        loadCount.Remove(sn.m_prefabName);
-        loadObj.Remove(sn.m_prefabName);
-
+        Destroy(sn.m_go);
         DecreaseTextureRefs(sn);
+
+        sn.m_bLoaded = false;
     }
 
-
-    void IncreaseTextureRefs(SceneNode sn)
+    void IncreaseTextureRefs(GameObject go)
     {
-        foreach (Texture tex in sn.m_textures)
+        if (go == null)
+            return;
+
+        MeshRenderer[] mrs = go.GetComponentsInChildren<MeshRenderer>();
+        SkinnedMeshRenderer[] smrs = go.GetComponentsInChildren<SkinnedMeshRenderer>();
+
+        List<Material> mats = new List<Material>();
+        foreach (MeshRenderer mr in mrs)
         {
-            if (texturesRefs.ContainsKey(tex))
+            mats.AddRange(mr.sharedMaterials);
+        }
+        foreach (SkinnedMeshRenderer smr in smrs)
+        {
+            mats.AddRange(smr.sharedMaterials);
+        }
+
+        foreach (Material mat in mats)
+        {
+            if (mat.mainTexture == null)
+                continue;
+
+            if (textureRefs.ContainsKey(mat.mainTexture))
             {
-                texturesRefs[tex]++;
+                textureRefs[mat.mainTexture]++;
             }
             else
             {
-                texturesRefs[tex] = 1;
+                textureRefs[mat.mainTexture] = 1;
             }
         }
     }
 
-    List<Texture> needUnloadTextures = new List<Texture>();
+    void IncreaseTextureRefs(SceneNode sn)
+    {
+        if (sn.m_go == null)
+            return;
+
+        MeshRenderer[] mrs = sn.m_go.GetComponentsInChildren<MeshRenderer>();
+        SkinnedMeshRenderer[] smrs = sn.m_go.GetComponentsInChildren<SkinnedMeshRenderer>();
+
+        sn.m_materials = new List<Material>();
+        foreach (MeshRenderer mr in mrs)
+        {
+            sn.m_materials.AddRange(mr.sharedMaterials);
+        }
+        foreach (SkinnedMeshRenderer smr in smrs)
+        {
+            sn.m_materials.AddRange(smr.sharedMaterials);
+        }
+
+        sn.m_textures = new List<Texture>();
+        foreach (Material mat in sn.m_materials)
+        {
+            if (mat.mainTexture == null)
+                continue;
+
+            sn.m_textures.Add(mat.mainTexture);
+
+            if (textureRefs.ContainsKey(mat.mainTexture))
+            {
+                textureRefs[mat.mainTexture]++;
+            }
+            else
+            {
+                textureRefs[mat.mainTexture] = 1;
+            }
+        }
+    }
+
+    List<Texture> needUnloadTexs = new List<Texture>();
     void DecreaseTextureRefs(SceneNode sn)
     {
-        needUnloadTextures.Clear();
+        needUnloadTexs.Clear();
 
         foreach (Texture tex in sn.m_textures)
         {
-            if (texturesRefs.ContainsKey(tex))
+            if (textureRefs.ContainsKey(tex))
             {
-                texturesRefs[tex]--;
+                textureRefs[tex]--;
 
-                if (texturesRefs[tex] <= 0)// need unload
+                if (textureRefs[tex] <= 0)// need unload
                 {
-                    needUnloadTextures.Add(tex);
+                    needUnloadTexs.Add(tex);
                 }
             }
         }
 
-        foreach (Texture tex in needUnloadTextures)
+        foreach (Texture tex in needUnloadTexs)
         {
-            Resources.UnloadAsset(tex);
+            textureRefs.Remove(tex);
 
-            texturesRefs.Remove(tex);
+            foreach (Material mat in sn.m_materials)
+            {
+                if (mat.mainTexture && mat.mainTexture == tex)
+                {
+                    Resources.UnloadAsset(mat);
+                }
+            }
+
+            Resources.UnloadAsset(tex);
         }
     }
-
 }
