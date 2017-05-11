@@ -267,10 +267,12 @@ public class QuadTree<T> where T : IQuadTreeObject
             }
         }
 
+        /*
         for (int i = 0; i < m_storedObjects.Count; i++)
         {
             Gizmos.DrawSphere(V2toV3(m_storedObjects[i].GetPosition()), m_minWidth * 0.02f);
         }
+        */
     }
 
     Vector3 V2toV3(Vector2 v2)

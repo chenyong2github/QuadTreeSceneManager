@@ -39,6 +39,7 @@ public class SceneNodeData : MonoBehaviour
     }
 
     //节点信息
+    public List<SceneNode> miniRectNodes = new List<SceneNode>();
     public List<SceneNode> nodes = new List<SceneNode>();
 
     public string treeName;
@@ -124,6 +125,22 @@ public class SceneNodeData : MonoBehaviour
 
     void SaveOneNode(QuadTree<SceneNode> treeInfo)
     {
+        SceneNode sn = new SceneNode();
+        if (treeInfo.storedObjects.Count > 0)
+        {
+            sn.prefabName = treeInfo.prefabName;
+
+            sn.position = Vector3.zero;
+            // calculate storedObject's average position
+            for(int i=0; i<treeInfo.storedObjects.Count; i++)
+            {
+                sn.position += treeInfo.storedObjects[i].position;
+            }
+            sn.position /= treeInfo.storedObjects.Count;
+
+            miniRectNodes.Add(sn);
+        }
+        
         for (int i = 0; i < treeInfo.storedObjects.Count; i++)
         {
             treeInfo.storedObjects[i].prefabName = treeInfo.prefabName;

@@ -37,7 +37,8 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     QuadTree<SceneNode> quadTree;
 
-    List<SceneNode> sceneNodes;
+    List<SceneNode> sceneNodes; //use mini rect as scene node
+    List<SceneNode> objectNodes; //objects in mini rect, just for draw gizmo
 
     Rect visibleArea;
     List<SceneNode> visibleSceneNodes;
@@ -54,6 +55,7 @@ public class QuadTreeSceneManager : MonoBehaviour
     void OnEnable()
     {
         sceneNodes = RetrieveSceneNodes();
+        objectNodes = RetrieveObjectsNodes(); //for debug
 
         quadTree = new QuadTree<SceneNode>(mapDensity, mapMinWidth, new Rect(-mapSize/2, -mapSize/2, mapSize, mapSize));
         foreach (SceneNode to in sceneNodes)
@@ -82,7 +84,16 @@ public class QuadTreeSceneManager : MonoBehaviour
             Gizmos.color = Color.white;
             foreach (SceneNode to in sceneNodes)
             {
-                Gizmos.DrawSphere(to.m_vPosition, 1*mapSize/1024f);
+                Gizmos.DrawSphere(to.m_vPosition, 1 * mapSize / 1024f);
+            }
+        }
+
+        if (objectNodes != null)
+        {
+            Gizmos.color = Color.black;
+            foreach (SceneNode to in objectNodes)
+            {
+                Gizmos.DrawSphere(to.m_vPosition, 0.5f * mapSize / 1024f);
             }
         }
 
@@ -119,13 +130,29 @@ public class QuadTreeSceneManager : MonoBehaviour
             sceneNodes = new List<SceneNode>(100);
         }
 
-        foreach (var item in snd.nodes)
+        foreach (var item in snd.miniRectNodes)
         {
             SceneNode newObject = new SceneNode(item.prefabName, item.name, item.position);
             sceneNodes.Add(newObject);
         }
 
         return sceneNodes;
+    }
+
+    List<SceneNode> RetrieveObjectsNodes()
+    {
+        if (objectNodes == null)
+        {
+            objectNodes = new List<SceneNode>(300);
+        }
+
+        foreach (var item in snd.nodes)
+        {
+            SceneNode newObject = new SceneNode(item.prefabName, item.name, item.position);
+            objectNodes.Add(newObject);
+        }
+
+        return objectNodes;
     }
 
     Rect GetPlayerVisibleArea()
