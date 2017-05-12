@@ -10,6 +10,18 @@ public class SceneNode : System.Object, IQuadTreeObject
     public string name;
     public Vector3 position;
 
+    public SceneNode()
+    {
+
+    }
+
+    public SceneNode(string pn, string n, Vector3 pos)
+    {
+        prefabName = pn;
+        name = n;
+        position = pos; position.y = 0;
+    }
+
     public Vector2 GetPosition()
     {
         //Ignore the Y position, Quad-trees operate on a 2D plane.

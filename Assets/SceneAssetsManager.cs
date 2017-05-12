@@ -4,13 +4,6 @@ using UnityEngine;
 
 public class SceneAssetsManager : MonoBehaviour {
 
-    public class SceneNodeAssets : SceneNode {
-        public GameObject m_go;
-        public List<Material> m_materials;
-        public List<Texture> m_textures;
-        public List<Mesh> m_meshs;
-    }
-
     private static SceneAssetsManager _instance = null;
     public static SceneAssetsManager Instance
     {
@@ -24,45 +17,55 @@ public class SceneAssetsManager : MonoBehaviour {
     public int loadDistance = 20;
     public int unloadDistance = 30;
 
-    HashSet<QuadTreeSceneManager.SceneNode> loadedSceneNodes = new HashSet<QuadTreeSceneManager.SceneNode>();
+    Dictionary<SceneNode, SceneNodeAssets> loadedSceneNodes = new Dictionary<SceneNode, SceneNodeAssets>();
+    Dictionary<SceneNode, SceneNodeAssets> needRemoveSceneNodes = new Dictionary<SceneNode, SceneNodeAssets>();
 
     public Dictionary<Texture, int> textureRefs = new Dictionary<Texture, int>();
 
     void Awake()
     {
         _instance = this;
+
+        Application.backgroundLoadingPriority = ThreadPriority.Normal;
+        GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
+
+        foreach (GameObject go in gos)
+        {
+            //IncreaseTextureRefs(go);
+        }
     }
 
-    void LoadSceneNode(QuadTreeSceneManager.SceneNode sn, string parentName, Transform parent)
+    SceneNodeAssets LoadSceneNode(SceneNode sn, string parentName, Transform parent)
     {
-        if (sn.m_bLoaded)
-            return;
-
-        UnityEngine.Object obj = Resources.Load("QuadTree/" + parentName + "/" + sn.m_prefabName);
+        UnityEngine.Object obj = Resources.Load("QuadTree/" + parentName + "/" + sn.prefabName);
         if (obj == null)
         {
-            Debug.LogError(sn.m_prefabName + "isn't exist!");
-            return;
+            Debug.LogError(sn.prefabName + "isn't exist!");
+            return null;
         }
 
         GameObject go = GameObject.Instantiate(obj) as GameObject;
         go.transform.parent = parent;
-        sn.m_go = go;
+
+        SceneNodeAssets sna = go.AddComponent<SceneNodeAssets>();
+        sna.sceneNode = sn;
 
         //IncreaseTextureRefs(sn);
 
-        sn.m_bLoaded = true;
+        sna.m_bLoaded = true;
+
+        return sna;
     }
 
-    void UnloadSceneNode(QuadTreeSceneManager.SceneNode sn)
+    void UnloadSceneNode(SceneNodeAssets sna)
     {
-        if (!sn.m_bLoaded)
+        if (!sna.m_bLoaded)
             return;
 
-        Destroy(sn.m_go);
-//        DecreaseTextureRefs(sn);
+        Destroy(sna.gameObject);
+        //        DecreaseTextureRefs(sn);
 
-        sn.m_bLoaded = false;
+        sna.m_bLoaded = false;
     }
 
     public Rect GetPlayerVisibleArea(int mapSize)
@@ -76,39 +79,37 @@ public class SceneAssetsManager : MonoBehaviour {
         return new Rect(Random.Range(-mapSize / 2, mapSize / 2), Random.Range(-mapSize / 2, mapSize / 2), 100 * mapSize / 1024f, 100 * mapSize / 1024f);
     }
 
-    List<QuadTreeSceneManager.SceneNode> needRemoveSceneNodes = new List<QuadTreeSceneManager.SceneNode>();
-    public void OnUpdate(List<QuadTreeSceneManager.SceneNode> visibleSceneNodes, string parentName, Transform parent)
+    public void OnUpdate(List<SceneNode> visibleSceneNodes, string parentName, Transform parent)
     {
         // load
-        foreach (QuadTreeSceneManager.SceneNode sn in visibleSceneNodes)
+        foreach (SceneNode sn in visibleSceneNodes)
         {
-            if (!loadedSceneNodes.Contains(sn))
+            if (!loadedSceneNodes.ContainsKey(sn))
             {
-                loadedSceneNodes.Add(sn);
+                SceneNodeAssets sna = LoadSceneNode(sn, parentName, parent);
 
-                LoadSceneNode(sn, parentName, parent);
+                loadedSceneNodes[sn] = sna;
             }
         }
-
 
         // unload
         needRemoveSceneNodes.Clear();
         if (player != null)
         {
-            foreach (QuadTreeSceneManager.SceneNode sn in loadedSceneNodes)
+            foreach (KeyValuePair<SceneNode, SceneNodeAssets> kv in loadedSceneNodes)
             {
-                Vector2 v = new Vector2(player.transform.position.x - sn.m_vPosition.x, player.transform.position.z - sn.m_vPosition.z);
+                Vector2 v = new Vector2(player.transform.position.x - kv.Key.position.x, player.transform.position.z - kv.Key.position.z);
                 if (v.sqrMagnitude > unloadDistance * unloadDistance)
                 {
-                    needRemoveSceneNodes.Add(sn);
+                    needRemoveSceneNodes.Add(kv.Key, kv.Value);
                 }
             }
 
-            foreach (QuadTreeSceneManager.SceneNode sn in needRemoveSceneNodes)
+            foreach (KeyValuePair<SceneNode, SceneNodeAssets> kv in needRemoveSceneNodes)
             {
-                loadedSceneNodes.Remove(sn);
+                loadedSceneNodes.Remove(kv.Key);
 
-                UnloadSceneNode(sn);
+                UnloadSceneNode(kv.Value);
             }
         }
     }

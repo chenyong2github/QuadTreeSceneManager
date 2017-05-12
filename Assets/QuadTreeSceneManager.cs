@@ -3,33 +3,6 @@ using System.Collections.Generic;
 
 public class QuadTreeSceneManager : MonoBehaviour
 {
-    public class SceneNode : IQuadTreeObject
-    {
-        public GameObject m_go;
-        public List<Material> m_materials;
-        public List<Texture> m_textures;
-        public List<Mesh> m_meshs;
-
-        public string m_name;
-        public string m_prefabName;        
-        public Vector3 m_vPosition;
-        public bool m_bLoaded;
-
-        public SceneNode(string prefabName, string name, Vector3 position, bool loaded = false)
-        {
-            m_prefabName = prefabName;
-            m_name = name;
-            m_vPosition = position; m_vPosition.y = 0;
-            m_bLoaded = loaded;
-        }
-
-        public Vector2 GetPosition()
-        {
-            //Ignore the Y position, Quad-trees operate on a 2D plane.
-            return new Vector2(m_vPosition.x, m_vPosition.z);
-        }
-    }
-
     private static QuadTreeSceneManager _instance = null;
     public static QuadTreeSceneManager Instance
     {
@@ -53,12 +26,7 @@ public class QuadTreeSceneManager : MonoBehaviour
     Rect visibleArea;
     List<SceneNode> visibleSceneNodes;
 
-    SceneAssetsManager sceneAssetsManager;    
-
     GameObject objParent;
-
-    Dictionary<Texture, int> textureRefs = new Dictionary<Texture, int>();
-
 
     void OnEnable()
     {
@@ -78,14 +46,6 @@ public class QuadTreeSceneManager : MonoBehaviour
     void Awake()
     {
         _instance = this;
-
-        Application.backgroundLoadingPriority = ThreadPriority.Normal;
-        GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
-
-        foreach (GameObject go in gos)
-        {
-            IncreaseTextureRefs(go);
-        }
     }
 
     void Update()
@@ -100,7 +60,7 @@ public class QuadTreeSceneManager : MonoBehaviour
             Gizmos.color = Color.white;
             foreach (SceneNode to in sceneNodes)
             {
-                Gizmos.DrawSphere(to.m_vPosition, 1 * mapSize / 1024f);
+                Gizmos.DrawSphere(to.position, 1 * mapSize / 1024f);
             }
         }
 
@@ -109,7 +69,7 @@ public class QuadTreeSceneManager : MonoBehaviour
             Gizmos.color = Color.black;
             foreach (SceneNode to in objectNodes)
             {
-                Gizmos.DrawSphere(to.m_vPosition, 0.5f * mapSize / 1024f);
+                Gizmos.DrawSphere(to.position, 0.5f * mapSize / 1024f);
             }
         }
 
@@ -128,7 +88,7 @@ public class QuadTreeSceneManager : MonoBehaviour
             Gizmos.color = Color.red;
             foreach (SceneNode to in visibleSceneNodes)
             {
-                Gizmos.DrawSphere(to.m_vPosition, 1 * mapSize / 1024f);
+                Gizmos.DrawSphere(to.position, 1 * mapSize / 1024f);
             }
         }
 
@@ -179,9 +139,11 @@ public class QuadTreeSceneManager : MonoBehaviour
         returnedSceneNodes.Clear();
         visibleSceneNodes = quadTree.RetrieveObjectsInArea(visibleArea, returnedSceneNodes);
 
+        //load and unload
         SceneAssetsManager.Instance.OnUpdate(visibleSceneNodes, snd.treeName, objParent.transform);
     }
 
+    /*
     void LoadSceneNode(SceneNode sn)
     {
         if (sn.m_bLoaded)
@@ -318,4 +280,5 @@ public class QuadTreeSceneManager : MonoBehaviour
             Resources.UnloadAsset(tex);
         }
     }
+    */
 }
