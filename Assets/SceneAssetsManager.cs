@@ -20,6 +20,7 @@ public class SceneAssetsManager : MonoBehaviour {
     Dictionary<SceneNode, SceneNodeAssets> loadedSceneNodes = new Dictionary<SceneNode, SceneNodeAssets>();
     Dictionary<SceneNode, SceneNodeAssets> needRemoveSceneNodes = new Dictionary<SceneNode, SceneNodeAssets>();
 
+    public Dictionary<Mesh, int> meshRefs = new Dictionary<Mesh, int>();
     public Dictionary<Texture, int> textureRefs = new Dictionary<Texture, int>();
 
     void Awake()
@@ -27,12 +28,8 @@ public class SceneAssetsManager : MonoBehaviour {
         _instance = this;
 
         Application.backgroundLoadingPriority = ThreadPriority.Normal;
-        GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
 
-        foreach (GameObject go in gos)
-        {
-            //IncreaseTextureRefs(go);
-        }
+        CountStaticGameObjectAssets();
     }
 
     SceneNodeAssets LoadSceneNode(SceneNode sn, string parentName, Transform parent)
@@ -48,24 +45,24 @@ public class SceneAssetsManager : MonoBehaviour {
         go.transform.parent = parent;
 
         SceneNodeAssets sna = go.AddComponent<SceneNodeAssets>();
-        sna.sceneNode = sn;
 
-        //IncreaseTextureRefs(sn);
+        IncreaseAssetsRefs(sna);
 
-        sna.m_bLoaded = true;
+        sna.loaded = true;
 
         return sna;
     }
 
     void UnloadSceneNode(SceneNodeAssets sna)
     {
-        if (!sna.m_bLoaded)
+        if (!sna.loaded)
             return;
 
         Destroy(sna.gameObject);
-        //        DecreaseTextureRefs(sn);
 
-        sna.m_bLoaded = false;
+        DecreaseAssetsRefs(sna);
+
+        sna.loaded = false;
     }
 
     public Rect GetPlayerVisibleArea(int mapSize)
@@ -110,6 +107,134 @@ public class SceneAssetsManager : MonoBehaviour {
                 loadedSceneNodes.Remove(kv.Key);
 
                 UnloadSceneNode(kv.Value);
+            }
+        }
+    }
+
+    void CountStaticGameObjectAssets()
+    {
+        GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
+
+        foreach (GameObject go in gos)
+        {
+            if (go == null)
+                return;
+
+            MeshFilter[] mfs = GetComponentsInChildren<MeshFilter>();
+            MeshRenderer[] mrs = go.GetComponentsInChildren<MeshRenderer>();
+            SkinnedMeshRenderer[] smrs = go.GetComponentsInChildren<SkinnedMeshRenderer>();
+
+            List<Mesh> meshs = new List<Mesh>();
+            foreach (MeshFilter mf in mfs)
+            {
+                meshs.Add(mf.sharedMesh);
+            }
+
+            foreach (Mesh mesh in meshs)
+            {
+                if (meshRefs.ContainsKey(mesh))
+                {
+                    meshRefs[mesh]++;
+                }
+                else
+                {
+                    meshRefs[mesh] = 1;
+                }
+            }
+
+            List<Material> mats = new List<Material>();
+            foreach (MeshRenderer mr in mrs)
+            {
+                mats.AddRange(mr.sharedMaterials);
+            }
+            foreach (SkinnedMeshRenderer smr in smrs)
+            {
+                mats.AddRange(smr.sharedMaterials);
+            }
+
+            foreach (Material mat in mats)
+            {
+                if (mat.mainTexture == null)
+                    continue;
+
+                if (textureRefs.ContainsKey(mat.mainTexture))
+                {
+                    textureRefs[mat.mainTexture]++;
+                }
+                else
+                {
+                    textureRefs[mat.mainTexture] = 1;
+                }
+            }
+        }
+    }
+
+    void IncreaseAssetsRefs(SceneNodeAssets sna)
+    {
+        foreach (Mesh mesh in sna.meshs)
+        {
+            if (meshRefs.ContainsKey(mesh))
+            {
+                meshRefs[mesh]++;
+            }
+            else
+            {
+                meshRefs[mesh] = 1;
+            }
+        }
+
+        foreach (Texture tex in sna.textures)
+        {
+            if (textureRefs.ContainsKey(tex))
+            {
+                textureRefs[tex]++;
+            }
+            else
+            {
+                textureRefs[tex] = 1;
+            }
+        }
+    }
+
+    void DecreaseAssetsRefs(SceneNodeAssets sna)
+    {
+        //check unload mesh
+        foreach (Mesh mesh in sna.meshs)
+        {
+            if (meshRefs.ContainsKey(mesh))
+            {
+                meshRefs[mesh]--;
+
+                if (meshRefs[mesh] <= 0)// need unload
+                {
+                    meshRefs.Remove(mesh);
+
+                    Resources.UnloadAsset(mesh);
+                }
+            }
+        }
+
+        // check unload texture
+        foreach (Texture tex in sna.textures)
+        {
+            if (textureRefs.ContainsKey(tex))
+            {
+                textureRefs[tex]--;
+
+                if (textureRefs[tex] <= 0)// need unload
+                {
+                    textureRefs.Remove(tex);
+
+                    foreach (Material mat in sna.materials)
+                    {
+                        if (mat.mainTexture && mat.mainTexture == tex)
+                        {
+                            Resources.UnloadAsset(mat);
+                        }
+                    }
+
+                    Resources.UnloadAsset(tex);
+                }
             }
         }
     }

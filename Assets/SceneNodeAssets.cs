@@ -4,50 +4,44 @@ using UnityEngine;
 
 public class SceneNodeAssets : MonoBehaviour {
 
-    public SceneNode sceneNode;
+    public bool loaded;
 
-    public bool m_bLoaded;
-    public List<Material> m_materials;
-    public List<Texture> m_textures;
-    public List<Mesh> m_meshs;
-
+    public List<Mesh> meshs = new List<Mesh>();
+    public List<Material> materials = new List<Material>();
+    public List<Texture> textures = new List<Texture>();    
 
     void Awake()
     {
+        MeshFilter[] mfs = GetComponentsInChildren<MeshFilter>();
+        MeshRenderer[] mrs = GetComponentsInChildren<MeshRenderer>();
+        SkinnedMeshRenderer[] smrs = GetComponentsInChildren<SkinnedMeshRenderer>();
 
+        foreach (MeshFilter mf in mfs)
+        {
+            meshs.Add(mf.sharedMesh);
+        }
+
+        foreach (MeshRenderer mr in mrs)
+        {
+            materials.AddRange(mr.sharedMaterials);
+        }
+
+        foreach (SkinnedMeshRenderer smr in smrs)
+        {
+            materials.AddRange(smr.sharedMaterials);
+        }
+
+        foreach (Material mat in materials)
+        {
+            if (mat.mainTexture == null)
+                continue;
+
+            textures.Add(mat.mainTexture);
+        }
     }
 
     void OnDestroy()
     {
          
-    }
-
-    public SceneNodeAssets(SceneNode sn)
-    {
-        m_bLoaded = false;
-
-        sceneNode = sn;
-
-        MeshRenderer[] mrs = GetComponentsInChildren<MeshRenderer>();
-        SkinnedMeshRenderer[] smrs = GetComponentsInChildren<SkinnedMeshRenderer>();
-
-        m_materials = new List<Material>();
-        foreach (MeshRenderer mr in mrs)
-        {
-            m_materials.AddRange(mr.sharedMaterials);
-        }
-        foreach (SkinnedMeshRenderer smr in smrs)
-        {
-            m_materials.AddRange(smr.sharedMaterials);
-        }
-
-        m_textures = new List<Texture>();
-        foreach (Material mat in m_materials)
-        {
-            if (mat.mainTexture == null)
-                continue;
-
-            m_textures.Add(mat.mainTexture);
-        }
     }
 }
