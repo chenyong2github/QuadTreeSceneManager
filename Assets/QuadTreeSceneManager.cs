@@ -16,7 +16,7 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     public int mapSize = 256;
     public int mapDensity = 5;
-    public int mapMinWidth = 10;
+    public float mapMinWidth = 10;
 
     QuadTree<SceneNode> quadTree;
 

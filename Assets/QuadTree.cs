@@ -31,7 +31,7 @@ public interface IQuadTreeObject
 [System.Serializable]
 public class QuadTree<T> where T : IQuadTreeObject
 {
-    private float m_minWidth;         //格子最小宽度(优先级大于最大数目)
+    private float m_minWidth;         //格子最小宽度(优先级大于最大数目), <=0表示不限制
     private int m_maxObjectCount;     //格子内最大容纳的物体数目
     private List<T> m_storedObjects;  //格子内的物体
     private Rect m_bounds;            //格子范围
@@ -74,7 +74,7 @@ public class QuadTree<T> where T : IQuadTreeObject
         //没有子节点 自己存储
         m_storedObjects.Add(objectToInsert);
         //大于最大存储数目拆为四个子节点
-        if (m_storedObjects.Count > m_maxObjectCount && (m_minWidth > 0 && m_bounds.width > m_minWidth))
+        if (m_storedObjects.Count > m_maxObjectCount && (m_minWidth <= 0 || m_bounds.width > m_minWidth))
         {
             //Split the quad into 4 sections
             if (m_cells == null)

@@ -29,7 +29,7 @@ public class SceneAssetsManager : MonoBehaviour {
 
         Application.backgroundLoadingPriority = ThreadPriority.Normal;
 
-        CountStaticGameObjectAssets();
+        CountStaticGameObjectAssetsRefs();
     }
 
     SceneNodeAssets LoadSceneNode(SceneNode sn, string parentName, Transform parent)
@@ -111,7 +111,7 @@ public class SceneAssetsManager : MonoBehaviour {
         }
     }
 
-    void CountStaticGameObjectAssets()
+    void CountStaticGameObjectAssetsRefs()
     {
         GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
 
