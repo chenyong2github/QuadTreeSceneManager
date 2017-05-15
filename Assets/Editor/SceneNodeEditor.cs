@@ -82,6 +82,9 @@ public class SceneNodeEditor : Editor
         Transform objs = go.transform.FindChild("Objs");
         foreach (Transform t in objs)
         {
+            PrefabLightmapData pld = t.gameObject.AddComponent<PrefabLightmapData>();
+            pld.SaveLightmap();
+            
             Object tempPrefab = PrefabUtility.CreateEmptyPrefab(szPath + "/" + t.name + ".prefab");
             tempPrefab = PrefabUtility.ReplacePrefab(t.gameObject, tempPrefab);
         }
