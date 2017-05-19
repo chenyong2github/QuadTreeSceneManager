@@ -62,13 +62,15 @@ public class SceneNodeData : MonoBehaviour
     public int mapMinWidth = 5;
 
     //子节点深度
-    public int depth = 1;
+    public int nodeDepth = 1;
+    public int layerMask = 0;
 
     public int objCount = 0;
 
     bool CheckTarget(Transform tParent, Transform tTarget)
     {
-        if (tTarget.gameObject.layer == 8) // Road
+        //忽略的layer
+        if (((1 << tTarget.gameObject.layer) & layerMask) > 0)
             return false;
 
         int nDepth = 1;
@@ -79,7 +81,7 @@ public class SceneNodeData : MonoBehaviour
             tTarget = tTarget.parent;
         }
 
-        return nDepth <= depth;
+        return nDepth <= nodeDepth;
     }
 
     string GetFullName(Transform tParent, Transform tTarget)

@@ -4,9 +4,79 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 
-public class SceneNodeEditor : Editor
+public class SceneNodeEditor : EditorWindow
 {
-    [MenuItem("Tools/SceneNode/ArrangeObj", false, 0)]
+    static int mapSize = 256;
+    static int mapDensity = 1;
+    static int mapMinWidth = 5;
+    static int nodeDepth = 2;
+    static LayerMask layerMask;
+
+    [MenuItem("Tools/SceneNodeEditor")]
+    static void Init()
+    {
+        SceneNodeEditor window = EditorWindow.GetWindow<SceneNodeEditor>("SceneNodeEditor");
+        window.minSize = new Vector2(40, window.minSize.y);
+        window.Show();
+    }
+
+    void OnEnable()
+    {
+        layerMask.value = EditorPrefs.GetInt("SceneNodeEditor_layerMask", 0);
+    }
+
+    void OnLostFocus()
+    {
+        EditorPrefs.SetInt("SceneNodeEditor_layerMask", layerMask.value);
+    }
+
+    void OnGUI()
+    {
+        mapSize = EditorGUILayout.IntField("Map Size", mapSize);
+        mapDensity = EditorGUILayout.IntField("Map Density", mapDensity);
+        mapMinWidth = EditorGUILayout.IntField("Map MinWidth", mapMinWidth);
+        EditorGUILayout.LabelField("-----Others-----");
+        nodeDepth = EditorGUILayout.IntField("Node Depth", nodeDepth);
+        layerMask = LayerMaskField("Ignore Layer", layerMask);
+
+        if (GUILayout.Button("Arrange"))
+            ArrangeObj();
+
+        if (GUILayout.Button("Batch"))
+            BatchGenPrefab();
+    }
+
+    static LayerMask LayerMaskField(string label, LayerMask layerMask)
+    {
+        List<string> layers = new List<string>();
+        List<int> layerNumbers = new List<int>();
+
+        for (int i = 0; i < 32; i++)
+        {
+            string layerName = LayerMask.LayerToName(i);
+            if (layerName != "")
+            {
+                layers.Add(layerName);
+                layerNumbers.Add(i);
+            }
+        }
+        int maskWithoutEmpty = 0;
+        for (int i = 0; i < layerNumbers.Count; i++)
+        {
+            if (((1 << layerNumbers[i]) & layerMask.value) > 0)
+                maskWithoutEmpty |= (1 << i);
+        }
+        maskWithoutEmpty = EditorGUILayout.MaskField(label, maskWithoutEmpty, layers.ToArray());
+        int mask = 0;
+        for (int i = 0; i < layerNumbers.Count; i++)
+        {
+            if ((maskWithoutEmpty & (1 << i)) > 0)
+                mask |= (1 << layerNumbers[i]);
+        }
+        layerMask.value = mask;
+        return layerMask;
+    }
+
     public static void ArrangeObj()
     {
         GameObject go = Selection.activeGameObject;
@@ -21,13 +91,19 @@ public class SceneNodeEditor : Editor
         tree.transform.parent = root.transform;
         tree.name = "QuadTreeInfo";
         SceneNodeData snd = tree.AddComponent<SceneNodeData>();
-        snd.depth = 2;
+        snd.mapSize = mapSize;
+        snd.mapDensity = mapDensity;
+        snd.mapMinWidth = mapMinWidth;
+        snd.nodeDepth = nodeDepth;
+        snd.layerMask = layerMask.value;
         snd.Save(go.transform);
 
         GameObject objs = new GameObject();
         objs.transform.parent = root.transform;
         objs.name = "Objs";
         ArrangeOneObj(snd.sceneTree, objs.transform);
+
+        Selection.activeGameObject = root;
     }
 
     private static void ArrangeOneObj(QuadTree<SceneNode> treeInfo, Transform root)
@@ -61,7 +137,6 @@ public class SceneNodeEditor : Editor
         }
     }
 
-    [MenuItem("Tools/SceneNode/Batch generate prefab", false, 0)]
     public static void BatchGenPrefab()
     {
         GameObject go = Selection.activeGameObject;
