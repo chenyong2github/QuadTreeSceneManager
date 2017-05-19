@@ -18,25 +18,34 @@ public class SceneNodeAssets : MonoBehaviour {
 
         foreach (MeshFilter mf in mfs)
         {
-            meshs.Add(mf.sharedMesh);
+            if (mf.sharedMesh == null)
+                Debug.LogErrorFormat("{0} MeshFilter is Missing !!!", mf.name);
+            else
+                meshs.Add(mf.sharedMesh);
         }
 
         foreach (MeshRenderer mr in mrs)
         {
-            materials.AddRange(mr.sharedMaterials);
+            if (mr.sharedMaterials == null)
+                Debug.LogErrorFormat("{0} MeshRenderer is Missing !!!", mr.name);
+            else
+                materials.AddRange(mr.sharedMaterials);
         }
 
         foreach (SkinnedMeshRenderer smr in smrs)
         {
-            materials.AddRange(smr.sharedMaterials);
+            if (smr.sharedMaterials == null)
+                Debug.LogErrorFormat("{0} SkinnedMeshRenderer is Missing !!!", smr.name);
+            else
+                materials.AddRange(smr.sharedMaterials);
         }
 
         foreach (Material mat in materials)
         {
             if (mat.mainTexture == null)
-                continue;
-
-            textures.Add(mat.mainTexture);
+                Debug.LogErrorFormat("{0} mainTexture is Missing !!!", mat.name);
+            else
+                textures.Add(mat.mainTexture);
         }
     }
 
