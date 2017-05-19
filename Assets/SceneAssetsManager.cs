@@ -199,8 +199,10 @@ public class SceneAssetsManager : MonoBehaviour {
     void DecreaseAssetsRefs(SceneNodeAssets sna)
     {
         //check unload mesh
-        foreach (Mesh mesh in sna.meshs)
+        for (int i = sna.meshs.Count - 1; i >= 0; --i)
         {
+            Mesh mesh = sna.meshs[i];
+
             if (meshRefs.ContainsKey(mesh))
             {
                 meshRefs[mesh]--;
@@ -215,8 +217,9 @@ public class SceneAssetsManager : MonoBehaviour {
         }
 
         // check unload texture
-        foreach (Texture tex in sna.textures)
+        for (int i = sna.textures.Count - 1; i >= 0; --i)
         {
+            Texture tex = sna.textures[i];
             if (textureRefs.ContainsKey(tex))
             {
                 textureRefs[tex]--;
