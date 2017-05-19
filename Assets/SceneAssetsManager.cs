@@ -22,6 +22,7 @@ public class SceneAssetsManager : MonoBehaviour {
 
     public Dictionary<Mesh, int> meshRefs = new Dictionary<Mesh, int>();
     public Dictionary<Texture, int> textureRefs = new Dictionary<Texture, int>();
+    public Dictionary<Material, int> materialRefs = new Dictionary<Material, int>();
 
     void Awake()
     {
@@ -154,6 +155,15 @@ public class SceneAssetsManager : MonoBehaviour {
 
             foreach (Material mat in mats)
             {
+                if (materialRefs.ContainsKey(mat))
+                {
+                    materialRefs[mat]++;
+                }
+                else
+                {
+                    materialRefs[mat] = 1;
+                }
+
                 if (mat.mainTexture == null)
                     continue;
 
@@ -180,6 +190,18 @@ public class SceneAssetsManager : MonoBehaviour {
             else
             {
                 meshRefs[mesh] = 1;
+            }
+        }
+
+        foreach (Material mat in sna.materials)
+        {
+            if (materialRefs.ContainsKey(mat))
+            {
+                materialRefs[mat]++;
+            }
+            else
+            {
+                materialRefs[mat] = 1;
             }
         }
 
@@ -214,6 +236,21 @@ public class SceneAssetsManager : MonoBehaviour {
             }
         }
 
+        foreach (Material mat in sna.materials)
+        {
+            if (materialRefs.ContainsKey(mat))
+            {
+                materialRefs[mat]--;
+
+                if (materialRefs[mat] <= 0)
+                {
+                    materialRefs.Remove(mat);
+
+                    Resources.UnloadAsset(mat);
+                }
+            }            
+        }
+
         // check unload texture
         foreach (Texture tex in sna.textures)
         {
@@ -224,16 +261,8 @@ public class SceneAssetsManager : MonoBehaviour {
                 if (textureRefs[tex] <= 0)// need unload
                 {
                     textureRefs.Remove(tex);
-
-                    foreach (Material mat in sna.materials)
-                    {
-                        if (mat.mainTexture && mat.mainTexture == tex)
-                        {
-                            Resources.UnloadAsset(mat);
-                        }
-                    }
-
-                    Resources.UnloadAsset(tex);
+                                
+                    Resources.UnloadAsset(tex);                 
                 }
             }
         }
