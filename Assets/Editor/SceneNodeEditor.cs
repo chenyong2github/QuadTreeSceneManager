@@ -44,6 +44,12 @@ public class SceneNodeEditor : EditorWindow
 
         if (GUILayout.Button("Batch"))
             BatchGenPrefab();
+
+        if (GUILayout.Button("SaveLightmapData"))
+            SaveLightmapData(Selection.activeGameObject);
+
+        if (GUILayout.Button("UseLightmapData"))
+            UseLightmapData(Selection.activeGameObject);
     }
 
     static LayerMask LayerMaskField(string label, LayerMask layerMask)
@@ -165,6 +171,26 @@ public class SceneNodeEditor : EditorWindow
         }
     }
 
+    static void SaveLightmapData(GameObject obj)
+    {
+        PrefabLightmapData pld = obj.GetComponent<PrefabLightmapData>();
+        if (pld == null)
+        {
+            pld = obj.AddComponent<PrefabLightmapData>();
+        }
+
+        pld.SaveLightmap();
+    }
+
+    static void UseLightmapData(GameObject obj)
+    {
+        PrefabLightmapData pld = obj.GetComponent<PrefabLightmapData>();
+        if (pld != null)
+        {
+            pld.LoadLightmap();
+        }
+    }
+
     static void CheckPath(string szPath)
     {
         if (!Directory.Exists(szPath))
@@ -180,29 +206,28 @@ public class SceneNodeEditor : EditorWindow
 
         Dictionary<string, int> nameNums = new Dictionary<string, int>();
 
-        Transform tParent = go.transform;
+        CheckChildrenNameUnique(nameNums, go.transform, 0);
+    }
 
+    static void CheckChildrenNameUnique(Dictionary<string, int> nameNums, Transform tParent, int deapth)
+    {
+        deapth++;
 
-        while (true)
+        foreach (Transform t in tParent.transform)
         {
-            bool duplicate = false;
-            nameNums.Clear();
-            foreach (Transform t in tParent)
+            if (deapth >= nodeDepth)
             {
-                if (nameNums.ContainsKey(t.name))
+                while (nameNums.ContainsKey(t.name))
                 {
-                    duplicate = true;
                     t.name += "_dupl";
                 }
 
                 nameNums[t.name] = 1;
-
-                if (duplicate)
-                    break;
             }
-
-            if (!duplicate)
-                break;
+            else
+            {
+                CheckChildrenNameUnique(nameNums, t, deapth);
+            }
         }
     }
 }
