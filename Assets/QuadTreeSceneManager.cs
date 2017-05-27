@@ -12,7 +12,7 @@ public class QuadTreeSceneManager : MonoBehaviour
         }
     }
 
-    public SceneNodeData snd;
+    SceneNodeData snd;
 
     public int mapSize = 256;
     public int mapDensity = 5;
@@ -30,6 +30,8 @@ public class QuadTreeSceneManager : MonoBehaviour
 
     void OnEnable()
     {
+        snd = GetComponent<SceneNodeData>();
+
         sceneNodes = RetrieveSceneNodes();
         objectNodes = RetrieveObjectsNodes(); //for debug
 
@@ -48,10 +50,7 @@ public class QuadTreeSceneManager : MonoBehaviour
         _instance = this;
     }
 
-    void Update()
-    {
-        UpdateSceneNodes();
-    }
+
 
     void OnDrawGizmos()
     {
@@ -132,14 +131,14 @@ public class QuadTreeSceneManager : MonoBehaviour
     }
 
     List<SceneNode> returnedSceneNodes = new List<SceneNode>();    
-    void UpdateSceneNodes()
+    public void UpdateSceneNodes(Vector3 center, Rect rect)
     {
-        visibleArea = SceneAssetsManager.Instance.GetPlayerVisibleArea(mapSize);
+        visibleArea = rect;
 
         returnedSceneNodes.Clear();
         visibleSceneNodes = quadTree.RetrieveObjectsInArea(visibleArea, returnedSceneNodes);
 
         //load and unload
-        SceneAssetsManager.Instance.OnUpdate(visibleSceneNodes, snd.treeName, objParent.transform);
+        SceneAssetsManager.Instance.OnUpdate(visibleSceneNodes, snd.treeName, objParent.transform, center);
     }
 }

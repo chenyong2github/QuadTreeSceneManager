@@ -12,6 +12,8 @@ public class SceneNodeEditor : EditorWindow
     static int nodeDepth = 2;
     static LayerMask layerMask;
 
+    private bool showLightMapInfo = false;
+
     [MenuItem("Tools/SceneNodeEditor")]
     static void Init()
     {
@@ -35,21 +37,44 @@ public class SceneNodeEditor : EditorWindow
         mapSize = EditorGUILayout.IntField("Map Size", mapSize);
         mapDensity = EditorGUILayout.IntField("Map Density", mapDensity);
         mapMinWidth = EditorGUILayout.IntField("Map MinWidth", mapMinWidth);
-        EditorGUILayout.LabelField("-----Others-----");
         nodeDepth = EditorGUILayout.IntField("Node Depth", nodeDepth);
         layerMask = LayerMaskField("Ignore Layer", layerMask);
 
-        if (GUILayout.Button("Arrange"))
+        if (GUILayout.Button("Split"))
             ArrangeObj();
+
+        if (GUILayout.Button("Clear"))
+            ClearPrefab();
 
         if (GUILayout.Button("Batch"))
             BatchGenPrefab();
+
+        EditorGUILayout.LabelField("-----Tools-----");
 
         if (GUILayout.Button("SaveLightmapData"))
             SaveLightmapData(Selection.activeGameObject);
 
         if (GUILayout.Button("UseLightmapData"))
             UseLightmapData(Selection.activeGameObject);
+
+        showLightMapInfo = EditorGUILayout.Foldout(showLightMapInfo, "ShowLightMapInfo");
+        if (showLightMapInfo)
+        {
+            MeshRenderer[] renderers = Selection.activeGameObject.GetComponentsInChildren<MeshRenderer>();
+            foreach (MeshRenderer r in renderers)
+            {
+                if (r.lightmapIndex != -1)
+                {
+                    EditorGUILayout.LabelField(string.Format("name:   {0}", r.name));
+                    EditorGUILayout.LabelField(string.Format("index:  {0}", r.lightmapIndex));
+                    EditorGUILayout.LabelField(string.Format("X: {0}", r.lightmapScaleOffset.x));
+                    EditorGUILayout.LabelField(string.Format("Y: {0}", r.lightmapScaleOffset.y));
+                    EditorGUILayout.LabelField(string.Format("Z: {0}", r.lightmapScaleOffset.z));
+                    EditorGUILayout.LabelField(string.Format("W: {0}", r.lightmapScaleOffset.w));
+                    EditorGUILayout.LabelField("----------");
+                }
+            }
+        }
     }
 
     static LayerMask LayerMaskField(string label, LayerMask layerMask)
@@ -96,6 +121,10 @@ public class SceneNodeEditor : EditorWindow
         GameObject tree = new GameObject();
         tree.transform.parent = root.transform;
         tree.name = "QuadTreeInfo";
+        tree.AddComponent<SceneDynLoadManager>();
+        tree.AddComponent<QuadTreeSceneManager>();
+        tree.AddComponent<SceneAssetsManager>();
+
         SceneNodeData snd = tree.AddComponent<SceneNodeData>();
         snd.mapSize = mapSize;
         snd.mapDensity = mapDensity;
@@ -108,6 +137,11 @@ public class SceneNodeEditor : EditorWindow
         objs.transform.parent = root.transform;
         objs.name = "Objs";
         ArrangeOneObj(snd.sceneTree, objs.transform);
+
+        //Base
+        SaveLightmapData(go);
+        go.name = "Base";
+        go.transform.parent = tree.transform;
 
         Selection.activeGameObject = root;
     }
@@ -141,6 +175,15 @@ public class SceneNodeEditor : EditorWindow
                 ArrangeOneObj(treeInfo.cells[i], root);
             }
         }
+    }
+
+    public static void ClearPrefab()
+    {
+        GameObject go = Selection.activeGameObject;
+        if (go == null) return;
+
+        string szPath = "Assets/Resources/QuadTree/" + go.name;
+        CheckPath(szPath, true);
     }
 
     public static void BatchGenPrefab()
@@ -191,12 +234,18 @@ public class SceneNodeEditor : EditorWindow
         }
     }
 
-    static void CheckPath(string szPath)
+    static void CheckPath(string szPath, bool reset = false)
     {
-        if (!Directory.Exists(szPath))
+        if (Directory.Exists(szPath))
         {
-            Directory.CreateDirectory(szPath);
+            if (reset)
+            {
+                Directory.Delete(szPath, true);
+            }
+            return;
         }
+
+        Directory.CreateDirectory(szPath);
     }
 
     public static void CheckChildrenNameUnique()

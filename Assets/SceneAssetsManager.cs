@@ -13,9 +13,8 @@ public class SceneAssetsManager : MonoBehaviour {
         }
     }
 
-    public GameObject player;
-    public int loadDistance = 20;
-    public int unloadDistance = 30;
+    [HideInInspector]
+    public int unloadDistance;
 
     Dictionary<SceneNode, SceneNodeAssets> loadedSceneNodes = new Dictionary<SceneNode, SceneNodeAssets>();
     Dictionary<SceneNode, SceneNodeAssets> needRemoveSceneNodes = new Dictionary<SceneNode, SceneNodeAssets>();
@@ -24,11 +23,21 @@ public class SceneAssetsManager : MonoBehaviour {
     public Dictionary<Texture, int> textureRefs = new Dictionary<Texture, int>();
     public Dictionary<Material, int> materialRefs = new Dictionary<Material, int>();
 
+    private bool _loaded = false;
+    public bool loaded { get { return _loaded; } }
+
     void Awake()
     {
         _instance = this;
+        _loaded = false;
 
         Application.backgroundLoadingPriority = ThreadPriority.Normal;
+    }
+
+    void Update()
+    {
+        if (loaded)
+            return;
 
         CountStaticGameObjectAssetsRefs();
     }
@@ -66,18 +75,7 @@ public class SceneAssetsManager : MonoBehaviour {
         sna.loaded = false;
     }
 
-    public Rect GetPlayerVisibleArea(int mapSize)
-    {
-        if (player != null)
-        {
-            Vector2 position = new Vector2(player.transform.position.x, player.transform.position.z);
-            return new Rect(position.x - loadDistance, position.y - loadDistance, loadDistance * 2, loadDistance * 2);
-        }
-
-        return new Rect(Random.Range(-mapSize / 2, mapSize / 2), Random.Range(-mapSize / 2, mapSize / 2), 100 * mapSize / 1024f, 100 * mapSize / 1024f);
-    }
-
-    public void OnUpdate(List<SceneNode> visibleSceneNodes, string parentName, Transform parent)
+    public void OnUpdate(List<SceneNode> visibleSceneNodes, string parentName, Transform parent, Vector3 center)
     {
         // load
         foreach (SceneNode sn in visibleSceneNodes)
@@ -92,89 +90,99 @@ public class SceneAssetsManager : MonoBehaviour {
 
         // unload
         needRemoveSceneNodes.Clear();
-        if (player != null)
+        foreach (KeyValuePair<SceneNode, SceneNodeAssets> kv in loadedSceneNodes)
         {
-            foreach (KeyValuePair<SceneNode, SceneNodeAssets> kv in loadedSceneNodes)
+            Vector2 v = new Vector2(center.x - kv.Key.position.x, center.z - kv.Key.position.z);
+            if (v.sqrMagnitude > unloadDistance * unloadDistance)
             {
-                Vector2 v = new Vector2(player.transform.position.x - kv.Key.position.x, player.transform.position.z - kv.Key.position.z);
-                if (v.sqrMagnitude > unloadDistance * unloadDistance)
-                {
-                    needRemoveSceneNodes.Add(kv.Key, kv.Value);
-                }
+                needRemoveSceneNodes.Add(kv.Key, kv.Value);
             }
+        }
 
-            foreach (KeyValuePair<SceneNode, SceneNodeAssets> kv in needRemoveSceneNodes)
-            {
-                loadedSceneNodes.Remove(kv.Key);
+        foreach (KeyValuePair<SceneNode, SceneNodeAssets> kv in needRemoveSceneNodes)
+        {
+            loadedSceneNodes.Remove(kv.Key);
 
-                UnloadSceneNode(kv.Value);
-            }
+            UnloadSceneNode(kv.Value);
         }
     }
 
     void CountStaticGameObjectAssetsRefs()
     {
-        GameObject[] gos = GameObject.FindObjectsOfType<GameObject>();
+        UnityEngine.SceneManagement.Scene nowScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        if (!nowScene.isLoaded)
+        {
+            return;
+        }
+
+        GameObject[] gos = nowScene.GetRootGameObjects();
 
         foreach (GameObject go in gos)
         {
-            if (go == null)
-                return;
+            CountOneObjRefs(go);
+        }
 
-            MeshFilter[] mfs = GetComponentsInChildren<MeshFilter>();
-            MeshRenderer[] mrs = go.GetComponentsInChildren<MeshRenderer>();
-            SkinnedMeshRenderer[] smrs = go.GetComponentsInChildren<SkinnedMeshRenderer>();
+        _loaded = true;
+    }
 
-            List<Mesh> meshs = new List<Mesh>();
-            foreach (MeshFilter mf in mfs)
+    void CountOneObjRefs(GameObject go)
+    {
+        if (go == null)
+            return;
+
+        MeshFilter[] mfs = go.GetComponentsInChildren<MeshFilter>(true);
+        MeshRenderer[] mrs = go.GetComponentsInChildren<MeshRenderer>(true);
+        SkinnedMeshRenderer[] smrs = go.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+
+        List<Mesh> meshs = new List<Mesh>();
+        foreach (MeshFilter mf in mfs)
+        {
+            meshs.Add(mf.sharedMesh);
+        }
+
+        foreach (Mesh mesh in meshs)
+        {
+            if (meshRefs.ContainsKey(mesh))
             {
-                meshs.Add(mf.sharedMesh);
+                meshRefs[mesh]++;
+            }
+            else
+            {
+                meshRefs[mesh] = 1;
+            }
+        }
+
+        List<Material> mats = new List<Material>();
+        foreach (MeshRenderer mr in mrs)
+        {
+            mats.AddRange(mr.sharedMaterials);
+        }
+        foreach (SkinnedMeshRenderer smr in smrs)
+        {
+            mats.AddRange(smr.sharedMaterials);
+        }
+
+        foreach (Material mat in mats)
+        {
+            if (materialRefs.ContainsKey(mat))
+            {
+                materialRefs[mat]++;
+            }
+            else
+            {
+                materialRefs[mat] = 1;
             }
 
-            foreach (Mesh mesh in meshs)
+            if (mat.mainTexture == null)
+                continue;
+
+            if (textureRefs.ContainsKey(mat.mainTexture))
             {
-                if (meshRefs.ContainsKey(mesh))
-                {
-                    meshRefs[mesh]++;
-                }
-                else
-                {
-                    meshRefs[mesh] = 1;
-                }
+                textureRefs[mat.mainTexture]++;
             }
-
-            List<Material> mats = new List<Material>();
-            foreach (MeshRenderer mr in mrs)
+            else
             {
-                mats.AddRange(mr.sharedMaterials);
-            }
-            foreach (SkinnedMeshRenderer smr in smrs)
-            {
-                mats.AddRange(smr.sharedMaterials);
-            }
-
-            foreach (Material mat in mats)
-            {
-                if (materialRefs.ContainsKey(mat))
-                {
-                    materialRefs[mat]++;
-                }
-                else
-                {
-                    materialRefs[mat] = 1;
-                }
-
-                if (mat.mainTexture == null)
-                    continue;
-
-                if (textureRefs.ContainsKey(mat.mainTexture))
-                {
-                    textureRefs[mat.mainTexture]++;
-                }
-                else
-                {
-                    textureRefs[mat.mainTexture] = 1;
-                }
+                textureRefs[mat.mainTexture] = 1;
             }
         }
     }
