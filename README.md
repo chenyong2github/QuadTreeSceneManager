@@ -1,2 +1,2 @@
 # QuadTreeSceneManager
-![](https://raw.githubusercontent.com/QuadTreeSceneManager/Screenshots/1.jpg)
+![](https://raw.githubusercontent.com/chenyong2github/QuadTreeSceneManager/master/Screenshots/1.jpg)
